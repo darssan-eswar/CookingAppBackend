@@ -2,39 +2,24 @@ package main
 
 import (
 	"CookingApp/routes"
-	"database/sql"
-	"fmt"
-	"log"
-	"os"
+	"CookingApp/utils"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	_ "github.com/tursodatabase/libsql-client-go/libsql"
 )
 
 func main() {
-	// Connect to Turso database
-	envErr := godotenv.Load(".env")
-	if envErr != nil {
-		log.Fatalf("Error loading .env file: %s", envErr)
+	// Load .env file
+	if err := utils.LoadEnv(); err != nil {
+		panic(err)
 	}
-
-	dbUrl := os.Getenv("DB_URL")
-	dbToken := os.Getenv("DB_TOKEN")
-
-	db, err := sql.Open("libsql", fmt.Sprintf("%s?authToken=%s", dbUrl, dbToken))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
 
 	// Create Gin router
 	router := gin.Default()
 
-	router.Use(func(c *gin.Context) {
-		c.Set("db", db)
-		c.Next()
-	})
+	// Middleware
+	router.Use(routes.AuthMiddleware)
+	router.Use(routes.DBMiddleware)
 
 	// Define routes
 	router.POST("/auth/login", routes.Login)

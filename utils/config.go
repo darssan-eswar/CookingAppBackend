@@ -1,7 +1,11 @@
 package utils
 
-import "database/sql"
+import "github.com/joho/godotenv"
 
-type App struct {
-	DB *sql.DB
+func LoadEnv() error {
+	err := godotenv.Load(".env")
+	if err != nil {
+		return err
+	}
+	return nil
 }
