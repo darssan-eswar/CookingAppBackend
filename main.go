@@ -10,9 +10,7 @@ import (
 
 func main() {
 	// Load .env file
-	if err := utils.LoadEnv(); err != nil {
-		panic(err)
-	}
+	utils.LoadEnv()
 
 	// Create Gin router
 	router := gin.Default()

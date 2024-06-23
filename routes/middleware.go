@@ -20,7 +20,7 @@ func DBMiddleware(c *gin.Context) {
 }
 
 func AuthMiddleware(c *gin.Context) {
-	apiToken := os.Getenv("API_TOKEN")
+	apiToken := os.Getenv("API_KEY")
 	token := c.GetHeader("Authorization")
 	if token != apiToken {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
