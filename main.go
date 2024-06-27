@@ -23,6 +23,9 @@ func main() {
 	router.POST("/auth/login", routes.Login)
 	router.POST("/auth/register", routes.Register)
 
+	router.GET("/recipes", routes.GetUserRecipes)
+	// router.POST("/recipes", routes.CreateRecipe)
+
 	// Start server
 	router.Run(":8080")
 }
