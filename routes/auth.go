@@ -8,6 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type responseBody struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Token    string `json:"token"`
+}
+
 type loginBody struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -32,7 +39,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user.Token)
+	c.JSON(http.StatusOK, responseBody{user.ID.String(), user.Username, user.Email, user.Token.String()})
 }
 
 type registerBody struct {
@@ -60,5 +67,5 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user.Token)
+	c.JSON(http.StatusCreated, responseBody{user.ID.String(), user.Username, user.Email, user.Token.String()})
 }
