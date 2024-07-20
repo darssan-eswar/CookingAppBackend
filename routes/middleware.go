@@ -1,33 +1,33 @@
 package routes
 
 import (
-	"CookingApp/utils"
 	"net/http"
 	"os"
 
-	"github.com/gin-gonic/gin"
+	"github.com/labstack/echo"
 )
 
-func DBMiddleware(c *gin.Context) {
-	db, err := utils.DBConnect()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		c.Abort()
-		return
+// Used for entire backend to protect from unauthorized access
+func ApiKeyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		envKey := os.Getenv("API_KEY")
+		key := c.Request().Header.Get("api-key")
+		if key != envKey {
+			return c.JSON(http.StatusBadRequest, "Unauthorized")
+		}
+
+		return next(c)
 	}
-	c.Set("db", db)
-	c.Next()
 }
 
-func AuthMiddleware(c *gin.Context) {
-	apiToken := os.Getenv("API_KEY")
-	authToken := c.GetHeader("Authorization")
-	if authToken != apiToken {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		c.Abort()
-		return
+// Used for protected routes where user's token is requried
+func AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		token := c.Request().Header.Get("Authorization")
+		if token == "" {
+			return c.JSON(http.StatusBadRequest, "Token is required")
+		}
+
+		return next(c)
 	}
-	token := c.GetHeader("Token")
-	c.Set("token", token)
-	c.Next()
 }

@@ -1,110 +1,233 @@
 package models
 
 import (
+	"cookingapp/storage"
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
-	ID              uuid.UUID `json:"id"`
-	Username        string    `json:"username"`
-	Email           string    `json:"email"`
-	Password        string    `json:"-"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
-	Token           uuid.UUID `json:"token"`
-	TokenExpiration time.Time `json:"token_expiration"`
+	ID                int     `json:"id"`
+	Username          string  `json:"username"`
+	Email             string  `json:"email"`
+	Password          string  `json:"password"`
+	Token             *string `json:"token"`
+	SubscriptionStart int64   `json:"subscriptionStart"`
+	SubscriptionEnd   int64   `json:"subscriptionEnd"`
 }
 
-func LoginUser(db *sql.DB, email string, password string) (User, error) {
-	var user User
-	var createdAt, updatedAt, tokenExpiration sql.NullTime
-	var id, token sql.NullString
+// create new user (should only be used in register)
+func newUser(username, email, password string) *User {
+	token := uuid.New().String()
 
-	err := db.QueryRow("SELECT id, email, username, password, created_at, updated_at, token, token_expiration FROM users WHERE email = ? AND password = ?", email, password).
-		Scan(&id, &user.Email, &user.Username, &user.Password, &createdAt, &updatedAt, &token, &tokenExpiration)
+	u := User{
+		Username:          username,
+		Email:             email,
+		Password:          password,
+		Token:             &token,
+		SubscriptionStart: 0,
+		SubscriptionEnd:   0,
+	}
+	return &u
+}
 
+// parse user from row
+func userFromRow(row *sql.Row) (*User, error) {
+	var u User
+
+	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.Password, &u.Token, &u.SubscriptionStart, &u.SubscriptionEnd)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return User{}, errors.New("user not found")
-		}
-		return User{}, err
+		return nil, err
 	}
 
-	// Parse UUID and time fields
-	if id.Valid {
-		user.ID, _ = uuid.Parse(id.String)
+	return &u, err
+}
+
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	if err != nil {
+		return "", err
 	}
-	if createdAt.Valid {
-		user.CreatedAt = createdAt.Time
+
+	return string(bytes), nil
+}
+
+func checkPasswordHash(password string, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+func (u *User) GetSubscriptionStart() *time.Time {
+	if u.SubscriptionStart == 0 {
+		return nil
 	}
-	if updatedAt.Valid {
-		user.UpdatedAt = updatedAt.Time
+
+	t := time.Unix(u.SubscriptionStart, 0)
+	return &t
+}
+
+func (u *User) GetSubscriptionEnd() *time.Time {
+	if u.SubscriptionEnd == 0 {
+		return nil
 	}
-	if token.Valid {
-		user.Token, _ = uuid.Parse(token.String)
+
+	t := time.Unix(u.SubscriptionEnd, 0)
+	return &t
+}
+
+// CREATE
+
+func CreateUserWithEmailUsernameAndPassword(email string, username string, password string) (*User, error) {
+
+	db, err := storage.GetDB()
+	if err != nil {
+		return nil, err
 	}
-	if tokenExpiration.Valid {
-		user.TokenExpiration = tokenExpiration.Time
+
+	passwordHash, err := hashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+
+	user := newUser(username, email, passwordHash)
+
+	_, err = db.Exec(`
+					INSERT INTO users
+					(username, email, password, token, subscription_start, subscription_end)
+					VALUES (?, ?, ?, ?, ?, ?)
+	`, user.Username, user.Email, user.Password, user.Token, user.SubscriptionStart, user.SubscriptionEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err = QueryUserByEmail(email)
+	if err != nil {
+		return nil, err
 	}
 
 	return user, nil
 }
 
-func RegisterUser(db *sql.DB, email string, username string, password string) (User, error) {
-	user := User{
-		ID:              uuid.New(),
-		Email:           email,
-		Username:        username,
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
-		Token:           uuid.New(),
-		TokenExpiration: time.Now().Add(24 * time.Hour),
+// READ
+
+func QueryUserByEmail(email string) (*User, error) {
+
+	db, err := storage.GetDB()
+	if err != nil {
+		return nil, err
 	}
 
-	_, err := db.Exec("INSERT INTO users (id, email, username, password, created_at, updated_at, token, token_expiration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		user.ID, user.Email, user.Username, user.Password, user.CreatedAt, user.UpdatedAt, user.Token, user.TokenExpiration)
+	row := db.QueryRow(`
+					SELECT
+					id, username, email, password, token, subscription_start, subscription_end
+					FROM users
+					WHERE email = ?
+	`, email)
+
+	return userFromRow(row)
+}
+
+func QueryUserByToken(token string) (*User, error) {
+
+	db, err := storage.GetDB()
 	if err != nil {
-		return User{}, err
+		return nil, err
+	}
+
+	row := db.QueryRow(`
+					SELECT
+					id, username, email, password, token, subscription_start, subscription_end
+					FROM users
+					WHERE token = ?
+	`, token)
+
+	return userFromRow(row)
+}
+
+func QueryUserByEmailAndPassword(email string, password string) (*User, error) {
+
+	db, err := storage.GetDB()
+	if err != nil {
+		return nil, err
+	}
+
+	row := db.QueryRow(`
+					SELECT
+					id, username, email, password, token, subscription_start, subscription_end
+					FROM users
+					WHERE email = ?
+	`, email)
+
+	user, err := userFromRow(row)
+	if err != nil {
+		return nil, err
+	}
+
+	if !checkPasswordHash(password, user.Password) {
+		return nil, err
 	}
 
 	return user, nil
 }
 
-func GetUser(db *sql.DB, token uuid.UUID) (User, error) {
-	var user User
-	var createdAt, updatedAt, tokenExpiration sql.NullTime
-	var id, tokenString sql.NullString
+// UPDATE
 
-	err := db.QueryRow("SELECT id, email, username, created_at, updated_at, token, token_expiration FROM users WHERE token = ?", token).
-		Scan(&id, &user.Email, &user.Username, &createdAt, &updatedAt, &tokenString, &tokenExpiration)
+func UpdateUser(user *User) error {
 
+	db, err := storage.GetDB()
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return User{}, errors.New("user not found")
-		}
-		return User{}, err
+		return err
 	}
 
-	// Parse UUID and time fields
-	if id.Valid {
-		user.ID, _ = uuid.Parse(id.String)
-	}
-	if createdAt.Valid {
-		user.CreatedAt = createdAt.Time
-	}
-	if updatedAt.Valid {
-		user.UpdatedAt = updatedAt.Time
-	}
-	if tokenString.Valid {
-		user.Token, _ = uuid.Parse(tokenString.String)
-	}
-	if tokenExpiration.Valid {
-		user.TokenExpiration = tokenExpiration.Time
+	_, err = db.Exec(`
+					UPDATE users
+					SET
+					username = ?,
+					email = ?,
+					password = ?,
+					token = ?,
+					subscription_start = ?,
+					subscription_end = ?
+					WHERE id = ?
+	`, user.Username, user.Email, user.Password, user.Token, user.SubscriptionStart, user.SubscriptionEnd, user.ID)
+	if err != nil {
+		return err
 	}
 
-	return user, nil
+	return nil
+}
+
+func ClearToken(token string) error {
+
+	db, err := storage.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("UPDATE users SET token = NULL WHERE token = ?", token)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DELETE
+
+func DeleteUserFromDB(id int) error {
+
+	db, err := storage.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM users WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

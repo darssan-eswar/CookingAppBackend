@@ -1,43 +1,57 @@
 package routes
 
 import (
-	"CookingApp/models"
-	"database/sql"
+	"cookingapp/models"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
+	"github.com/labstack/echo"
 )
 
-type createRecipeBody struct {
+type getRecipesRequest struct {
+	Limit  int `query:"limit"`
+	Offset int `query:"offset"`
+}
+
+func GetRecipes(e echo.Context) error {
+
+	var request getRecipesRequest
+	if err := e.Bind(&request); err != nil {
+		e.String(http.StatusBadRequest, err.Error())
+	}
+
+	if request.Limit == 0 || request.Limit > 30 {
+		request.Limit = 10
+	}
+
+	token := e.Request().Header.Get("Authorization")
+
+	recipes, err := models.ReadRecipesFromDBWithToken(token, request.Limit, request.Offset)
+	if err != nil {
+		e.String(http.StatusInternalServerError, err.Error())
+	}
+
+	return e.JSON(http.StatusOK, recipes)
+}
+
+type createRecipeRequest struct {
 	Name        string              `json:"name"`
 	Description string              `json:"description"`
 	Ingredients []models.Ingredient `json:"ingredients"`
 }
 
-func CreateRecipe(c *gin.Context) {
-	db := c.MustGet("db").(*sql.DB)
+func CreateRecipe(e echo.Context) error {
 
-	var body createRecipeBody
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	var request createRecipeRequest
+	if err := e.Bind(&request); err != nil {
+		e.String(http.StatusBadRequest, err.Error())
 	}
 
-	recipe, err := models.CreateRecipe(db, body.Name, body.Description, body.Ingredients)
+	token := e.Request().Header.Get("Authorization")
+
+	err := models.CreateRecipeInDB(token, request.Name, request.Description, request.Ingredients)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		e.String(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusCreated, recipe)
-}
-
-func GetUserRecipes(c *gin.Context) {
-	db := c.MustGet("db").(*sql.DB)
-	token := c.MustGet("token").(string)
-	recipes, err := models.GetUserRecipes(db, token)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, recipes)
+	return e.String(http.StatusCreated, "Recipe created")
 }

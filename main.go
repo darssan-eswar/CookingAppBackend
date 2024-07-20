@@ -1,31 +1,42 @@
 package main
 
 import (
-	"CookingApp/routes"
-	"CookingApp/utils"
+	"cookingapp/routes"
+	"cookingapp/storage"
+	"cookingapp/utils"
 
-	"github.com/gin-gonic/gin"
-	_ "github.com/tursodatabase/libsql-client-go/libsql"
+	"github.com/labstack/echo"
 )
 
 func main() {
 	// Load .env file
 	utils.LoadEnv()
 
-	// Create Gin router
-	router := gin.Default()
+	// Connect to database
+	err := storage.InitDB()
+	if err != nil {
+		panic(err)
+	}
 
-	// Middleware
-	router.Use(routes.AuthMiddleware)
-	router.Use(routes.DBMiddleware)
+	// Create router
+	e := echo.New()
 
-	// Define routes
-	router.POST("/auth/login", routes.Login)
-	router.POST("/auth/register", routes.Register)
+	// Use use auth middleware (api-key header)
+	e.Use(routes.ApiKeyMiddleware)
 
-	router.GET("/recipes", routes.GetUserRecipes)
-	// router.POST("/recipes", routes.CreateRecipe)
+	// Routes
 
-	// Start server
-	router.Run(":8080")
+	// Auth
+	auth := e.Group("/auth")
+	auth.POST("/login", routes.Login)
+	auth.POST("/register", routes.Register)
+	auth.GET("/token", routes.LoginWithToken)
+	auth.GET("/logout", routes.Logout)
+
+	// protected
+	protected := e.Group("/protected")
+	protected.Use(routes.AuthMiddleware)
+	protected.Use(routes.AuthMiddleware)
+
+	e.Logger.Fatal(e.Start(":8080"))
 }
