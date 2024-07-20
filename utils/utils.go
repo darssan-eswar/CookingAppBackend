@@ -7,11 +7,7 @@ import (
 )
 
 func LoadEnv() error {
-	err := godotenv.Load(".env")
-	if err != nil {
-		return err
-	}
-	return nil
+	return godotenv.Load(".env")
 }
 
 func Decode[T any](bytes []byte) (T, error) {
