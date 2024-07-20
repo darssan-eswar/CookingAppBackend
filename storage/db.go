@@ -23,7 +23,8 @@ func InitDB() error {
 		return fmt.Errorf("DB_URL and DB_TOKEN must be set")
 	}
 
-	db, err := sql.Open("libsql", fmt.Sprintf("%s?authToken=%s", dbUrl, dbToken))
+	var err error
+	db, err = sql.Open("libsql", fmt.Sprintf("%s?authToken=%s", dbUrl, dbToken))
 	if err != nil {
 		return err
 	}
