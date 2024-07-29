@@ -1,71 +1,111 @@
 package routes
 
 import (
-	"CookingApp/models"
-	"database/sql"
+	"cookingapp/models"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
+	"github.com/labstack/echo"
 )
 
 type responseBody struct {
-	ID       string `json:"id"`
+	ID       int    `json:"id"`
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Token    string `json:"token"`
 }
 
-type loginBody struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+type loginRequest struct {
+	Email    string `body:"email"`
+	Password string `body:"email"`
 }
 
-func Login(c *gin.Context) {
-	db := c.MustGet("db").(*sql.DB)
+func Login(e echo.Context) error {
 
-	var body loginBody
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	var request loginRequest
+	if err := e.Bind(&request); err != nil {
+		return err
 	}
 
-	if body.Email == "" || body.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email and password are required"})
-		return
+	if request.Email == "" || request.Password == "" {
+		return e.JSON(http.StatusBadRequest, "Email and password are required")
 	}
 
-	user, err := models.LoginUser(db, body.Email, body.Password)
+	user, err := models.QueryUserByEmailAndPassword(request.Password, request.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return e.JSON(http.StatusBadRequest, "Invalid email or password")
 	}
 
-	c.JSON(http.StatusOK, responseBody{user.ID.String(), user.Username, user.Email, user.Token.String()})
+	return e.JSON(http.StatusOK, responseBody{
+		ID:       user.ID,
+		Username: user.Username,
+		Email:    user.Email,
+		Token:    *user.Token,
+	})
 }
 
-type registerBody struct {
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+type registerRequest struct {
+	Email    string `body:"email"`
+	Username string `body:"username"`
+	Password string `body:"password"`
 }
 
-func Register(c *gin.Context) {
-	db := c.MustGet("db").(*sql.DB)
+func Register(e echo.Context) error {
 
-	var body registerBody
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	var request registerRequest
+
+	if err := e.Bind(&request); err != nil {
+		return err
 	}
 
-	if body.Email == "" || body.Username == "" || body.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email, username and password are required"})
-		return
+	if request.Email == "" || request.Username == "" || request.Password == "" {
+		return e.JSON(http.StatusBadRequest, "Email, username and password are required")
 	}
 
-	user, err := models.RegisterUser(db, body.Email, body.Username, body.Password)
+	user, err := models.CreateUserWithEmailUsernameAndPassword(request.Email, request.Username, request.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return e.JSON(http.StatusBadRequest, "Error creating user")
 	}
 
-	c.JSON(http.StatusCreated, responseBody{user.ID.String(), user.Username, user.Email, user.Token.String()})
+	return e.JSON(http.StatusOK, responseBody{
+		ID:       user.ID,
+		Username: user.Username,
+		Email:    user.Email,
+		Token:    *user.Token,
+	})
+}
+
+func LoginWithToken(e echo.Context) error {
+
+	token := e.Request().Header.Get("Authorization")
+
+	if token == "" {
+		return e.JSON(http.StatusBadRequest, "Token is required")
+	}
+
+	user, err := models.QueryUserByToken(token)
+	if err != nil {
+		return e.JSON(http.StatusBadRequest, "Invalid token")
+	}
+
+	return e.JSON(http.StatusOK, responseBody{
+		ID:       user.ID,
+		Username: user.Username,
+		Email:    user.Email,
+		Token:    *user.Token,
+	})
+}
+
+func Logout(e echo.Context) error {
+
+	token := e.Request().Header.Get("Authorization")
+	if token == "" {
+		return e.JSON(http.StatusBadRequest, "Token is required")
+	}
+
+	err := models.ClearToken(token)
+	if err != nil {
+		return e.JSON(http.StatusBadRequest, "Invalid token")
+	}
+
+	return e.JSON(http.StatusOK, "Logged out")
 }
