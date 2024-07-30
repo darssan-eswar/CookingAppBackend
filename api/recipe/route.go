@@ -1,7 +1,7 @@
-package routes
+package recipe
 
 import (
-	"cookingapp/models"
+	"cookingapp/api/ingredient"
 	"net/http"
 
 	"github.com/labstack/echo"
@@ -12,6 +12,7 @@ type getRecipesRequest struct {
 	Offset int `query:"offset"`
 }
 
+// GET /protected/recipes?limit=<int>&offset=<int>
 func GetRecipes(e echo.Context) error {
 
 	var request getRecipesRequest
@@ -25,7 +26,7 @@ func GetRecipes(e echo.Context) error {
 
 	token := e.Request().Header.Get("Authorization")
 
-	recipes, err := models.ReadRecipesFromDBWithToken(token, request.Limit, request.Offset)
+	recipes, err := readWithToken(token, request.Limit, request.Offset)
 	if err != nil {
 		e.String(http.StatusInternalServerError, err.Error())
 	}
@@ -34,11 +35,12 @@ func GetRecipes(e echo.Context) error {
 }
 
 type createRecipeRequest struct {
-	Name        string              `json:"name"`
-	Description string              `json:"description"`
-	Ingredients []models.Ingredient `json:"ingredients"`
+	Name        string                  `json:"name"`
+	Description string                  `json:"description"`
+	Ingredients []ingredient.Ingredient `json:"ingredients"`
 }
 
+// POST /protected/recipes
 func CreateRecipe(e echo.Context) error {
 
 	var request createRecipeRequest
@@ -48,10 +50,10 @@ func CreateRecipe(e echo.Context) error {
 
 	token := e.Request().Header.Get("Authorization")
 
-	err := models.CreateRecipeInDB(token, request.Name, request.Description, request.Ingredients)
+	recipe, err := create(token, request.Name, request.Description, request.Ingredients)
 	if err != nil {
 		e.String(http.StatusInternalServerError, err.Error())
 	}
 
-	return e.String(http.StatusCreated, "Recipe created")
+	return e.JSON(http.StatusCreated, recipe)
 }

@@ -1,22 +1,11 @@
-package utils
+package util
 
 import (
-	"encoding/json"
-
 	"github.com/joho/godotenv"
 )
 
-func LoadEnv() error {
-	return godotenv.Load(".env")
-}
-
-func Decode[T any](bytes []byte) (T, error) {
-	var decoded T
-	err := json.Unmarshal(bytes, decoded)
-	if err != nil {
-		return decoded, err
-	}
-	return decoded, nil
+func LoadEnvFromPath(path string) error {
+	return godotenv.Load(path)
 }
 
 type Optional[T any] struct {

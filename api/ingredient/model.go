@@ -1,4 +1,4 @@
-package models
+package ingredient
 
 type Ingredient struct {
 	Name     string  `json:"name"`

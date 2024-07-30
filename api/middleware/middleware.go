@@ -1,4 +1,4 @@
-package routes
+package middleware
 
 import (
 	"net/http"
@@ -7,7 +7,7 @@ import (
 	"github.com/labstack/echo"
 )
 
-// Used for entire backend to protect from unauthorized access
+// Used to protect entire backend from unauthorized access
 func ApiKeyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		envKey := os.Getenv("API_KEY")

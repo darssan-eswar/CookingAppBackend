@@ -2,8 +2,8 @@ package storage
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
-	"log"
 	"os"
 
 	_ "github.com/tursodatabase/libsql-client-go/libsql"
@@ -20,7 +20,7 @@ func InitDB() error {
 	dbToken := os.Getenv("DB_TOKEN")
 
 	if dbUrl == "" || dbToken == "" {
-		return fmt.Errorf("DB_URL and DB_TOKEN must be set")
+		return errors.New("DB_URL and DB_TOKEN must be set")
 	}
 
 	var err error
@@ -34,7 +34,6 @@ func InitDB() error {
 		return err
 	}
 
-	log.Println("Connected to database")
 	return nil
 }
 

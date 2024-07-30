@@ -1,0 +1,62 @@
+===================================================================
+API DOCS FOR COOKING APP
+===================================================================
+
+==========================AUTH ROUTES==============================
+
+POST /auth/login
+HEADERS: { Content-Type: application/json }
+BODY: { email: string, password: string }
+RESPONSE: User
+
+POST /auth/register
+HEADERS: { Content-Type: application/json }
+BODY: { email: string, username: string, password: string }
+RESPONSE: User
+
+GET /auth/token
+HEADERS: { Authorization: <token: string> }
+BODY: {}
+RESPONSE: User
+
+DELETE /auth/logout
+HEADERS: { Authorization: <token: string> }
+BODY: {}
+RESPONSE: {}
+
+==========================RECIPE ROUTES============================
+
+GET /protected/recipes
+HEADERS: { Authorization: <token: string> }
+BODY: {}
+RESPONSE: Recipe[]
+
+POST /protected/recipes
+HEADERS: { Authorization: <token: string> }
+BODY: { name: string, description: string, ingredients: Ingredient[] }
+RESPONSE: Recipe
+
+=============================TYPES=================================
+
+User = {
+    id: string
+    email: string
+    username: string
+    password: string
+    token: string?
+    subscriptionStart: int64
+    subscriptionEnd: int64
+}
+
+Recipe = {
+    id: string
+    name: string
+    description: string
+    ingredients: Ingredient[]
+}
+
+Ingredient = {
+    name: string
+    unit: string
+    quantity: float64
+}

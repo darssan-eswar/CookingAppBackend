@@ -1,16 +1,18 @@
 package main
 
 import (
-	"cookingapp/routes"
+	"cookingapp/api/middleware"
+	"cookingapp/api/recipe"
+	"cookingapp/api/user"
 	"cookingapp/storage"
-	"cookingapp/utils"
+	"cookingapp/util"
 
 	"github.com/labstack/echo"
 )
 
 func main() {
 	// Load .env file
-	utils.LoadEnv()
+	util.LoadEnvFromPath("./.env")
 
 	// Connect to database
 	err := storage.InitDB()
@@ -21,22 +23,24 @@ func main() {
 	// Create router
 	e := echo.New()
 
-	// Use use auth middleware (api-key header)
-	e.Use(routes.ApiKeyMiddleware)
+	// e.Use(middleware.ApiKeyMiddleware) // check for api key header
 
 	// Routes
 
-	// Auth
+	// auth
 	auth := e.Group("/auth")
-	auth.POST("/login", routes.Login)
-	auth.POST("/register", routes.Register)
-	auth.GET("/token", routes.LoginWithToken)
-	auth.GET("/logout", routes.Logout)
+	auth.POST("/login", user.Login)
+	auth.POST("/register", user.Register)
+	auth.GET("/token", user.LoginWithToken)
+	auth.DELETE("/logout", user.Logout)
 
 	// protected
 	protected := e.Group("/protected")
-	protected.Use(routes.AuthMiddleware)
-	protected.Use(routes.AuthMiddleware)
+	protected.Use(middleware.AuthMiddleware) // check for token header
+	// recipes
+	recipes := protected.Group("/recipes")
+	recipes.GET("/", recipe.GetRecipes)
+	recipes.POST("/", recipe.CreateRecipe)
 
 	e.Logger.Fatal(e.Start(":8080"))
 }
