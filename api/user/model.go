@@ -18,9 +18,11 @@ type User struct {
 	SubscriptionEnd   int64   `json:"subscriptionEnd"`
 }
 
+// creates a new user object with a random id and token and sets the subscription start and end to 0
 func new(email, username, password string) *User {
-	token := uuid.New().String()
+	token := uuid.NewString()
 	u := User{
+		ID:                uuid.NewString(),
 		Email:             email,
 		Username:          username,
 		Password:          password,
@@ -31,6 +33,7 @@ func new(email, username, password string) *User {
 	return &u
 }
 
+// hashes password to protect from database leaks
 func hashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	if err != nil {
@@ -40,12 +43,14 @@ func hashPassword(password string) (string, error) {
 	return string(bytes), nil
 }
 
+// compares stored hashed password to plain text password
 func checkPasswordHash(password string, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
 }
 
-func isUsernameAvailable(email string) (bool, error) {
+// returns true if there is no account with the given email
+func isEmailAvailable(email string) (bool, error) {
 
 	db, err := storage.GetDB()
 	if err != nil {
@@ -62,6 +67,7 @@ func isUsernameAvailable(email string) (bool, error) {
 	return !rows.Next(), nil
 }
 
+// creates a new user and writes it to the database
 func create(email string, username string, password string) (*User, error) {
 
 	db, err := storage.GetDB()
@@ -70,7 +76,7 @@ func create(email string, username string, password string) (*User, error) {
 	}
 
 	// check for existing email
-	available, err := isUsernameAvailable(email)
+	available, err := isEmailAvailable(email)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +105,7 @@ func create(email string, username string, password string) (*User, error) {
 	return user, nil
 }
 
+// gets user from database by email and password
 func queryByEmailAndPassword(email string, password string) (*User, error) {
 
 	db, err := storage.GetDB()
@@ -106,6 +113,7 @@ func queryByEmailAndPassword(email string, password string) (*User, error) {
 		return nil, err
 	}
 
+	// select user from database
 	row := db.QueryRow(`
 		SELECT
 		id, email, username, password, token, subscription_start, subscription_end
@@ -116,9 +124,11 @@ func queryByEmailAndPassword(email string, password string) (*User, error) {
 	var user User
 	err = row.Scan(&user.ID, &user.Email, &user.Username, &user.Password, &user.Token, &user.SubscriptionStart, &user.SubscriptionEnd)
 	if err != nil {
+		// returns error if there are no rows
 		return nil, errors.New("no account with that email")
 	}
 
+	// compares stored hashed password to plain text password
 	if !checkPasswordHash(password, user.Password) {
 		return nil, errors.New("incorrect password")
 	}
@@ -126,6 +136,7 @@ func queryByEmailAndPassword(email string, password string) (*User, error) {
 	return &user, nil
 }
 
+// gets user from database by token
 func queryByToken(token string) (*User, error) {
 
 	db, err := storage.GetDB()
@@ -149,6 +160,7 @@ func queryByToken(token string) (*User, error) {
 	return &user, nil
 }
 
+// sets token to null in database
 func clearToken(token string) error {
 
 	db, err := storage.GetDB()
@@ -164,7 +176,8 @@ func clearToken(token string) error {
 	return nil
 }
 
-func DeleteFromDB(id string) error {
+// deletes user from database
+func Delete(id string) error {
 
 	db, err := storage.GetDB()
 	if err != nil {
